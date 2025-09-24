@@ -1,34 +1,27 @@
-#!/usr/bin/env python3
+# server/seed.py
 
-from random import choice as rc
+from app import create_app, db
+from server.app.models import Message
+from datetime import datetime
 
-from faker import Faker
+# Create the Flask app using the factory
+app = create_app()
 
-from app import app
-from models import db, Message
+# Use the app context so SQLAlchemy knows which app to work with
+with app.app_context():
+    # Drop existing tables (if any) and create new ones
+    db.drop_all()
+    db.create_all()
 
-fake = Faker()
+    # Seed sample messages
+    messages = [
+        Message(username="Alice", body="Hello!", created_at=datetime.utcnow()),
+        Message(username="Bob", body="Hi there!", created_at=datetime.utcnow()),
+        Message(username="Charlie", body="How's it going?", created_at=datetime.utcnow())
+    ]
 
-usernames = [fake.first_name() for i in range(4)]
-if "Duane" not in usernames:
-    usernames.append("Duane")
-
-def make_messages():
-
-    Message.query.delete()
-    
-    messages = []
-
-    for i in range(20):
-        message = Message(
-            body=fake.sentence(),
-            username=rc(usernames),
-        )
-        messages.append(message)
-
+    # Add messages to the session and commit
     db.session.add_all(messages)
-    db.session.commit()        
+    db.session.commit()
 
-if __name__ == '__main__':
-    with app.app_context():
-        make_messages()
+    print("Database seeded successfully")

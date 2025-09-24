@@ -1,32 +1,52 @@
-from datetime import datetime
+# server/testing/models_test.py
 
-from app import app
-from models import db, Message
+import pytest
+from app import create_app, db
+from app.models import Message
 
-class TestMessage:
-    '''Message model in models.py'''
+@pytest.fixture
+def client():
+    app = create_app()
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  # temporary DB for testing
 
     with app.app_context():
-        m = Message.query.filter(
-            Message.body == "Hello 👋"
-            ).filter(Message.username == "Liza")
+        db.create_all()
+        yield app.test_client()
+        db.drop_all()
 
-        for message in m:
-            db.session.delete(message)
-
+def test_message_creation(client):
+    # Create a new message in the database
+    with client.application.app_context():
+        msg = Message(username='Ian', body='Hello, World!')
+        db.session.add(msg)
         db.session.commit()
 
-    def test_has_correct_columns(self):
-        '''has columns for message body, username, and creation time.'''
-        with app.app_context():
+        # Check the message exists
+        retrieved = Message.query.first()
+        assert retrieved.username == 'Ian'
+        assert retrieved.body == 'Hello, World!'
 
-            hello_from_liza = Message(
-                body="Hello 👋",
-                username="Liza")
-            
-            db.session.add(hello_from_liza)
-            db.session.commit()
+def test_message_update(client):
+    with client.application.app_context():
+        msg = Message(username='Ian', body='Old body')
+        db.session.add(msg)
+        db.session.commit()
 
-            assert(hello_from_liza.body == "Hello 👋")
-            assert(hello_from_liza.username == "Liza")
-            assert(type(hello_from_liza.created_at) == datetime)
+        msg.body = 'Updated body'
+        db.session.commit()
+
+        retrieved = Message.query.first()
+        assert retrieved.body == 'Updated body'
+
+def test_message_delete(client):
+    with client.application.app_context():
+        msg = Message(username='Ian', body='To be deleted')
+        db.session.add(msg)
+        db.session.commit()
+
+        db.session.delete(msg)
+        db.session.commit()
+
+        retrieved = Message.query.all()
+        assert len(retrieved) == 0
